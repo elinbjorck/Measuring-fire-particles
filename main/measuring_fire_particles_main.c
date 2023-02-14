@@ -13,6 +13,7 @@
 #include "esp_spi_flash.h"
 #include "driver/gpio.h"
 
+#include "esp_sds011-1.1.0/src/Sds011.h"
 
 void app_main()
 {
