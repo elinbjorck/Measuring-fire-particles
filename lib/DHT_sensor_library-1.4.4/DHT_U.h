@@ -32,8 +32,8 @@
 
 #ifndef DHT_U_H
 #define DHT_U_H
-
 #include <Adafruit_Sensor.h>
+// 
 #include <DHT.h>
 
 #define DHT_SENSOR_VERSION 1 /**< Sensor Version */

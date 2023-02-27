@@ -3,7 +3,7 @@
 #include "DHT.h"
 
 SdsDustSensor sds(Serial2);
-#define dhtpin 12
+#define dhtpin 26
 DHT dht(dhtpin, 11, 1);
 
 void setup() {
@@ -17,24 +17,31 @@ void setup() {
 
   sds.begin();
   dht.begin();
-
+  sds.wakeup();
   Serial.println(sds.queryFirmwareVersion().toString()); 
   sds.setQueryReportingMode();
 
 }
 
 void loop() {
-  sds.wakeup();
-  sleep(2);
-  PmResult ressult =  sds.queryPm();
   float humidity = dht.readHumidity(false);
-  float temp = dht.readTemperature(false, false);
 
-  if (ressult.isOk()) {
-  Serial.printf("Temp: %f. Humidity: %f\n", temp, humidity);
-  Serial.printf("PM2.5: %f. PM10: %f\n", ressult.pm25, ressult.pm10);
+  if (humidity < 65) {
+    sds.wakeup();
+    sleep(2);
+    float temp = dht.readTemperature(false, false);
+    PmResult ressult =  sds.queryPm();
+
+
+    if (ressult.isOk()) {
+      Serial.printf("Temp: %f. Humidity: %f\n", temp, humidity);
+      Serial.printf("PM2.5: %f. PM10: %f\n", ressult.pm25, ressult.pm10);
+    }
+    sds.sleep();
+  } else {
+    Serial.printf("Humidity of: %f is to high for dust sensor\n", humidity);
+
   }
-  sds.sleep();
   sleep(5);
   // put your main code here, to run repeatedly:
 }
