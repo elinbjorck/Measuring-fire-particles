@@ -21,8 +21,10 @@ void loop() {
   sds.wakeup();
   sleep(2);
   PmResult ressult =  sds.queryPm();
-  Serial.println(ressult.pm25);
+  if (ressult.isOk()) {
+  Serial.printf("PM2.5: %f. PM10: %f\n", ressult.pm25, ressult.pm10);
+  }
   sds.sleep();
-  sleep(2);
+  sleep(5);
   // put your main code here, to run repeatedly:
 }
