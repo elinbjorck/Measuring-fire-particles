@@ -6,6 +6,18 @@ SdsDustSensor sds(Serial2);
 #define dhtpin 26
 DHT dht(dhtpin, 11, 1);
 
+// Found here: https://forum.arduino.cc/t/serial-write-a-float-value/110198/8
+typedef union {
+ float floatingPoint;
+ byte binary[4];
+} binaryFloat;
+
+void send_float(float sensorValue) {
+  binaryFloat value;
+  value.floatingPoint = sensorValue;
+  Serial.write(value.binary, 4);
+}
+
 float meassure(int measureTimeSek, boolean verbose)  {
   float humidity = dht.readHumidity(false);
 
@@ -22,6 +34,7 @@ float meassure(int measureTimeSek, boolean verbose)  {
         Serial.printf("Temp: %f. Humidity: %f\n", temp, humidity);
         Serial.printf("PM2.5: %f. PM10: %f\n", ressult.pm25, ressult.pm10);
       }
+      send_float(ressult.pm25);
       return ressult.pm25;
     }
   } else {
