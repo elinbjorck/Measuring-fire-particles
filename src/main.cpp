@@ -1,11 +1,18 @@
 #include <Arduino.h>
 #include "SdsDustSensor.h"
 #include "DHT.h"
+#include "WiFi.h"
+
+// define SSID and PASSWORD in wifi_config.h (not git tracked)
+// #ifndef SSID && PASSWORD
+// #define SSID "<yourssid>"
+// #define PASSWORD "<yourwifipassword>"
+// #endif
+#include "wifi_config.h"
 
 SdsDustSensor sds(Serial2);
 #define dhtpin 26
 DHT dht(dhtpin, 11, 1);
-
 // Found here: https://forum.arduino.cc/t/serial-write-a-float-value/110198/8
 // typedef union {
 //  float floatingPoint;
@@ -54,7 +61,8 @@ float meanTest(int timeMin) {
 
   Serial.printf("\nStartring %d minutes meassure.", timeMin);
   for (int i = 0; i < steps; i++) {
-    int pm25 = meassure(measureTimeSek, false);
+    // Serial.printf("\nSum: %f  steps: %d", sum, stepsThatCount);
+    float pm25 = meassure(measureTimeSek, false);
     if(pm25 != -1) {
       sum += pm25;
       stepsThatCount++;
@@ -92,9 +100,25 @@ void setup() {
   Serial.println(sds.queryFirmwareVersion().toString()); 
   sds.setQueryReportingMode();
 
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(SSID, PASSWORD);
+
+  Serial.print("\nconnecting");
+
+  while(WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(100);
+  }
+
+  Serial.print("Wifi connected");
+  Serial.print("\nLocal ESP32 IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("ESP32 MAC: ");
+  Serial.println(WiFi.macAddress());
+ 
 }
 
 void loop() {
   meassure(2, true);
-  sleep(5);
+  sleep(3);
 }
