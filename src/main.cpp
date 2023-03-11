@@ -5,6 +5,7 @@
 #include "mqtt_client.h"
 #include "PubSubClient.h"
 #include "FreeRTOSConfig.h"
+#include "ArduinoJson.h"
 
 // define SSID and PASSWORD in wifi_config.h (not git tracked)
 // #ifndef SSID && PASSWORD
