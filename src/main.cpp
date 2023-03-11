@@ -5,7 +5,6 @@
 #include "mqtt_client.h"
 #include "PubSubClient.h"
 #include "FreeRTOSConfig.h"
-#include "ArduinoJson.h"
 
 // define SSID and PASSWORD in wifi_config.h (not git tracked)
 // #ifndef SSID && PASSWORD
@@ -34,6 +33,11 @@ DHT dht(dhtpin, 11, 1);
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+float pm25;
+float pm10;
+float humidity;
+float temperature;
 
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
@@ -73,28 +77,38 @@ void connectMQTT() {
   }
 }
 
+void connect() {
+  connectWiFi();
+  connectMQTT();
+}
+
 void sendData() {
-  
+  char jsonString[128];
+  sprintf(jsonString, "{ \"pm25\": %f,  \"pm10\": %f, \"humidity\": %f, \"temperature\": %f}", pm25, pm10, humidity, temperature);
+
+  client.publish("fire/data", jsonString);
 }
 
 float meassure(int measureTimeSek, boolean verbose)  {
-  float humidity = dht.readHumidity(false);
+  humidity = dht.readHumidity(false);
 
   if (humidity < 65) {
     sds.wakeup();
     sleep(measureTimeSek);
 
-    float temp = dht.readTemperature(false, false);
-    PmResult ressult =  sds.queryPm();
+    temperature = dht.readTemperature(false, false);
+    PmResult result =  sds.queryPm();
     sds.sleep();
 
-    if (ressult.isOk()) {
+    if (result.isOk()) {
+      pm25 = result.pm25;
+      pm10 = result.pm10;
+      
+      sendData();
       if (verbose) {
-        Serial.printf("Temp: %f. Humidity: %f\n", temp, humidity);
-        Serial.printf("PM2.5: %f. PM10: %f\n", ressult.pm25, ressult.pm10);
+        Serial.printf("Temp: %f. Humidity: %f\n", temperature, humidity);
+        Serial.printf("PM2.5: %f. PM10: %f\n", pm25, pm10);
       }
-      // send_float(ressult.pm25);
-      return ressult.pm25;
     }
   } else {
     Serial.printf("Humidity of: %f is to high for dust sensor\n", humidity);
@@ -152,15 +166,13 @@ void setup() {
   Serial.println(sds.queryFirmwareVersion().toString()); 
   sds.setQueryReportingMode();
 
-  connectWiFi();
-  connectMQTT();
- 
+  connect();
 }
 
 void loop() {
   meassure(2, true);
   sleep(3);
   if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
+    connect();
   }
 }
