@@ -2,6 +2,9 @@
 #include "SdsDustSensor.h"
 #include "DHT.h"
 #include "WiFi.h"
+#include "mqtt_client.h"
+#include "PubSubClient.h"
+#include "FreeRTOSConfig.h"
 
 // define SSID and PASSWORD in wifi_config.h (not git tracked)
 // #ifndef SSID && PASSWORD
@@ -12,7 +15,10 @@
 
 SdsDustSensor sds(Serial2);
 #define dhtpin 26
+#define wifiFlag false
 DHT dht(dhtpin, 11, 1);
+#define mqttUsername "mqttparticles"
+#define mqttPassword "particlespassword"
 // Found here: https://forum.arduino.cc/t/serial-write-a-float-value/110198/8
 // typedef union {
 //  float floatingPoint;
@@ -24,6 +30,51 @@ DHT dht(dhtpin, 11, 1);
 //   value.floatingPoint = sensorValue;
 //   Serial.write(value.binary, 4);
 // }
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void connectWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(SSID, PASSWORD);
+
+  Serial.print("\nconnecting");
+
+  while(WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(100);
+  }
+
+  Serial.print("Wifi connected");
+  Serial.print("\nLocal ESP32 IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("ESP32 MAC: ");
+  Serial.println(WiFi.macAddress());
+}
+
+void connectMQTT() {
+  // esp_mqtt_client_config_t config = {
+  //   .uri = "mqtt://homeassistant.local",
+  //   .username = mqttUsername,
+  //   .password = mqttPassword
+  // };
+  // esp_mqtt_client_handle_t handle = esp_mqtt_client_init(&config);
+  // esp_mqtt_client_start(handle);
+  // Serial.print("Connecting to mqtt brooker");
+  // return handle;
+  Serial.println("Connecting to mqtt brooker");
+  client.setServer("homeassistant.local", 1883);
+  if (client.connect("fire", mqttUsername, mqttPassword)) {
+    Serial.println("sucsess!");
+    client.publish("fire/status", "{ \"value\": true }");
+  } else {
+    Serial.println("No connect fo u :(");
+  }
+}
+
+void sendData() {
+  
+}
 
 float meassure(int measureTimeSek, boolean verbose)  {
   float humidity = dht.readHumidity(false);
@@ -100,25 +151,15 @@ void setup() {
   Serial.println(sds.queryFirmwareVersion().toString()); 
   sds.setQueryReportingMode();
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(SSID, PASSWORD);
-
-  Serial.print("\nconnecting");
-
-  while(WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(100);
-  }
-
-  Serial.print("Wifi connected");
-  Serial.print("\nLocal ESP32 IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("ESP32 MAC: ");
-  Serial.println(WiFi.macAddress());
+  connectWiFi();
+  connectMQTT();
  
 }
 
 void loop() {
   meassure(2, true);
   sleep(3);
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+  }
 }
