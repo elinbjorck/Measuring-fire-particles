@@ -39,6 +39,8 @@ float pm10;
 float humidity;
 float temperature;
 
+boolean newData = false;
+
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(SSID, PASSWORD);
@@ -58,15 +60,7 @@ void connectWiFi() {
 }
 
 void connectMQTT() {
-  // esp_mqtt_client_config_t config = {
-  //   .uri = "mqtt://homeassistant.local",
-  //   .username = mqttUsername,
-  //   .password = mqttPassword
-  // };
-  // esp_mqtt_client_handle_t handle = esp_mqtt_client_init(&config);
-  // esp_mqtt_client_start(handle);
-  // Serial.print("Connecting to mqtt brooker");
-  // return handle;
+
   Serial.println("Connecting to mqtt brooker");
   client.setServer("homeassistant.local", 1883);
   if (client.connect("fire", mqttUsername, mqttPassword)) {
@@ -89,7 +83,7 @@ void sendData() {
   client.publish("fire/data", jsonString);
 }
 
-float meassure(int measureTimeSek, boolean verbose)  {
+void meassure(int measureTimeSek, boolean verbose)  {
   humidity = dht.readHumidity(false);
 
   if (humidity < 65) {
@@ -103,8 +97,8 @@ float meassure(int measureTimeSek, boolean verbose)  {
     if (result.isOk()) {
       pm25 = result.pm25;
       pm10 = result.pm10;
-      
-      sendData();
+      newData = true;
+      // sendData();
       if (verbose) {
         Serial.printf("Temp: %f. Humidity: %f\n", temperature, humidity);
         Serial.printf("PM2.5: %f. PM10: %f\n", pm25, pm10);
@@ -113,43 +107,68 @@ float meassure(int measureTimeSek, boolean verbose)  {
   } else {
     Serial.printf("Humidity of: %f is to high for dust sensor\n", humidity);
   }
-  return -1;
 }
 
-float meanTest(int timeMin) {
-  int sleepTimeSek = 2;
-  int measureTimeSek = 5;
-  int steps = (int)roundf(timeMin * 60 / (sleepTimeSek + measureTimeSek));
+void sendDataTask(void * pvParameters) {
+  configASSERT( ( ( uint32_t ) pvParameters ) == 1 );
 
-  float sum = 0;
-  int stepsThatCount = 0;
-
-
-  Serial.printf("\nStartring %d minutes meassure.", timeMin);
-  for (int i = 0; i < steps; i++) {
-    // Serial.printf("\nSum: %f  steps: %d", sum, stepsThatCount);
-    float pm25 = meassure(measureTimeSek, false);
-    if(pm25 != -1) {
-      sum += pm25;
-      stepsThatCount++;
+  while( true ) {
+    if(newData) {
+      if (WiFi.status() != WL_CONNECTED) {
+        connect();
+      }
+      sendData();
+      newData = false;
+    } else {
+      delay(100);
     }
-    sleep(sleepTimeSek);
   }
-  return sum / stepsThatCount;
 }
 
-void repeatedMeanTest() {
-  int timeMin = 10;
-  float mean = meanTest(timeMin);
-  Serial.printf("mean value of PM2.5 during %d minutes: %f\n", timeMin, mean);
-  Serial.println("New test will start in one minute. Set up your new enviroment");
-  sleep(55);
-  for (int i = 0; i < 5; i++)
-  {
-    Serial.printf("%d... ", 5 - i);
-    sleep(1);
+void measureTask(void * pvParameters) {
+  configASSERT( ( ( uint32_t ) pvParameters ) == 1 );
+
+  while( true ) {
+    meassure(2,  true);
+    sleep(3);
   }
+
 }
+
+// float meanTest(int timeMin) {
+//   int sleepTimeSek = 2;
+//   int measureTimeSek = 5;
+//   int steps = (int)roundf(timeMin * 60 / (sleepTimeSek + measureTimeSek));
+
+//   float sum = 0;
+//   int stepsThatCount = 0;
+
+
+//   Serial.printf("\nStartring %d minutes meassure.", timeMin);
+//   for (int i = 0; i < steps; i++) {
+//     // Serial.printf("\nSum: %f  steps: %d", sum, stepsThatCount);
+//     float pm25 = meassure(measureTimeSek, false);
+//     if(pm25 != -1) {
+//       sum += pm25;
+//       stepsThatCount++;
+//     }
+//     sleep(sleepTimeSek);
+//   }
+//   return sum / stepsThatCount;
+// }
+
+// void repeatedMeanTest() {
+//   int timeMin = 10;
+//   float mean = meanTest(timeMin);
+//   Serial.printf("mean value of PM2.5 during %d minutes: %f\n", timeMin, mean);
+//   Serial.println("New test will start in one minute. Set up your new enviroment");
+//   sleep(55);
+//   for (int i = 0; i < 5; i++)
+//   {
+//     Serial.printf("%d... ", 5 - i);
+//     sleep(1);
+//   }
+// }
 
 void setup() {
   // put your setup code here, to run once:
@@ -167,12 +186,26 @@ void setup() {
   sds.setQueryReportingMode();
 
   connect();
+
+  xTaskCreate(
+    sendDataTask, 
+    "sendDataTask", 
+    2048,
+    ( void * ) 1,
+    2,
+    NULL
+  );
+
+  xTaskCreate(
+    measureTask, 
+    "meassureTask", 
+    2048,
+    ( void * ) 1,
+    1,
+    NULL
+  );
 }
 
 void loop() {
-  meassure(2, true);
-  sleep(3);
-  if (WiFi.status() != WL_CONNECTED) {
-    connect();
-  }
+  delay(1000);
 }
